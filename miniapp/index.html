@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Adobe Creative Cloud</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1c1c1e;
+      color: #ffffff;
+      min-height: 100vh;
+      padding-bottom: 40px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #2d1b69 0%, #1a1a2e 100%);
+      padding: 32px 20px 24px;
+      text-align: center;
+      border-bottom: 1px solid #2c2c2e;
+    }
+
+    .adobe-logo {
+      width: 56px;
+      height: 56px;
+      background: #FA0F00;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 28px;
+      font-weight: 900;
+      color: white;
+      font-family: 'Adobe Clean', sans-serif;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: #8e8e93;
+      line-height: 1.4;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #8e8e93;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 24px 20px 10px;
+    }
+
+    .plans {
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .plan-card {
+      background: #2c2c2e;
+      border-radius: 16px;
+      padding: 18px 20px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plan-card:active { transform: scale(0.98); }
+
+    .plan-card.selected {
+      border-color: #5e5ce6;
+      background: #1c1c3a;
+    }
+
+    .plan-card.popular {
+      border-color: #30d158;
+    }
+
+    .plan-card.popular.selected {
+      border-color: #5e5ce6;
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #30d158;
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .plan-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .plan-icon {
+      font-size: 28px;
+      width: 44px;
+      text-align: center;
+    }
+
+    .plan-info h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .plan-info .duration {
+      font-size: 13px;
+      color: #8e8e93;
+    }
+
+    .plan-price {
+      font-size: 26px;
+      font-weight: 700;
+      color: #5e5ce6;
+    }
+
+    .plan-price span {
+      font-size: 15px;
+      color: #8e8e93;
+      font-weight: 400;
+    }
+
+    .plan-features {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .feature-tag {
+      background: #3a3a3c;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #ebebf5cc;
+    }
+
+    .selected-indicator {
+      display: none;
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: 22px;
+      height: 22px;
+      background: #5e5ce6;
+      border-radius: 50%;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .plan-card.selected .selected-indicator { display: flex; }
+
+    /* Email form */
+    .email-section {
+      padding: 0 16px;
+      margin-top: 4px;
+    }
+
+    .email-input-wrap {
+      background: #2c2c2e;
+      border-radius: 16px;
+      padding: 4px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    .email-input-wrap:focus-within {
+      border-color: #5e5ce6;
+    }
+
+    .email-icon { font-size: 18px; }
+
+    .email-input-wrap input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 16px;
+      padding: 14px 0;
+    }
+
+    .email-input-wrap input::placeholder { color: #636366; }
+
+    .hint {
+      font-size: 12px;
+      color: #636366;
+      margin-top: 8px;
+      padding: 0 4px;
+    }
+
+    /* Summary */
+    .summary {
+      margin: 16px 16px 0;
+      background: #2c2c2e;
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: none;
+    }
+
+    .summary.show { display: block; }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 15px;
+    }
+
+    .summary-row:not(:last-child) {
+      border-bottom: 1px solid #3a3a3c;
+    }
+
+    .summary-label { color: #8e8e93; }
+    .summary-value { font-weight: 600; }
+    .summary-price { color: #5e5ce6; font-size: 18px; }
+
+    /* Button */
+    .btn-wrap {
+      padding: 20px 16px 0;
+    }
+
+    .btn-order {
+      width: 100%;
+      background: #5e5ce6;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-order:active { transform: scale(0.98); opacity: 0.9; }
+    .btn-order:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Success screen */
+    .success-screen {
+      display: none;
+      text-align: center;
+      padding: 60px 30px;
+    }
+
+    .success-screen.show { display: block; }
+    .main-content.hide { display: none; }
+
+    .success-icon { font-size: 72px; margin-bottom: 20px; }
+    .success-screen h2 { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
+    .success-screen p { font-size: 15px; color: #8e8e93; line-height: 1.6; }
+
+    .order-details {
+      background: #2c2c2e;
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin: 24px 0;
+      text-align: left;
+    }
+
+    .order-details .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+
+    .order-details .row:not(:last-child) {
+      border-bottom: 1px solid #3a3a3c;
+    }
+
+    .row-label { color: #8e8e93; }
+  </style>
+</head>
+<body>
+
+<div class="main-content" id="mainContent">
+
+  <div class="header">
+    <div class="adobe-logo">Ai</div>
+    <h1>Adobe Creative Cloud</h1>
+    <p>Все приложения Adobe в одной подписке</p>
+  </div>
+
+  <div class="section-title">Выбери тариф</div>
+
+  <div class="plans">
+
+    <div class="plan-card" onclick="selectPlan('plan_14')" id="card_plan_14">
+      <div class="selected-indicator">✓</div>
+      <div class="plan-header">
+        <div class="plan-icon">⚡</div>
+        <div class="plan-info">
+          <h3>Пробный период</h3>
+          <div class="duration">14 дней доступа</div>
+        </div>
+      </div>
+      <div class="plan-price">249₽ <span>/ 2 недели</span></div>
+      <div class="plan-features">
+        <span class="feature-tag">Photoshop</span>
+        <span class="feature-tag">Illustrator</span>
+        <span class="feature-tag">Premiere Pro</span>
+      </div>
+    </div>
+
+    <div class="plan-card" onclick="selectPlan('plan_30')" id="card_plan_30">
+      <div class="selected-indicator">✓</div>
+      <div class="plan-header">
+        <div class="plan-icon">📅</div>
+        <div class="plan-info">
+          <h3>Месячная</h3>
+          <div class="duration">30 дней доступа</div>
+        </div>
+      </div>
+      <div class="plan-price">490₽ <span>/ месяц</span></div>
+      <div class="plan-features">
+        <span class="feature-tag">Все приложения</span>
+        <span class="feature-tag">100 ГБ облако</span>
+      </div>
+    </div>
+
+    <div class="plan-card popular" onclick="selectPlan('plan_90')" id="card_plan_90">
+      <div class="popular-badge">Выгоднее</div>
+      <div class="selected-indicator">✓</div>
+      <div class="plan-header">
+        <div class="plan-icon">🏆</div>
+        <div class="plan-info">
+          <h3>Квартальная</h3>
+          <div class="duration">90 дней доступа</div>
+        </div>
+      </div>
+      <div class="plan-price">1290₽ <span>/ 3 месяца</span></div>
+      <div class="plan-features">
+        <span class="feature-tag">Все приложения</span>
+        <span class="feature-tag">100 ГБ облако</span>
+        <span class="feature-tag">Экономия 180₽</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-title">Твой email для активации</div>
+
+  <div class="email-section">
+    <div class="email-input-wrap">
+      <span class="email-icon">✉️</span>
+      <input
+        type="email"
+        id="emailInput"
+        placeholder="example@gmail.com"
+        oninput="onEmailInput()"
+        autocomplete="email"
+      >
+    </div>
+    <div class="hint">На этот аккаунт Adobe будет добавлена подписка</div>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="summary-row">
+      <span class="summary-label">Тариф</span>
+      <span class="summary-value" id="summaryPlan">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Email</span>
+      <span class="summary-value" id="summaryEmail">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">К оплате</span>
+      <span class="summary-value summary-price" id="summaryPrice">—</span>
+    </div>
+  </div>
+
+  <div class="btn-wrap">
+    <button class="btn-order" id="orderBtn" disabled onclick="submitOrder()">
+      Оформить заявку
+    </button>
+  </div>
+
+</div>
+
+<!-- Success screen -->
+<div class="success-screen" id="successScreen">
+  <div class="success-icon">🎉</div>
+  <h2>Заявка принята!</h2>
+  <p>Мы активируем подписку Adobe CC на твой email в течение 1–3 часов.</p>
+
+  <div class="order-details" id="orderDetails"></div>
+
+  <p style="color: #636366; font-size: 13px;">Реквизиты для оплаты придут отдельным сообщением в боте</p>
+</div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+
+  const BOT_TOKEN = "8423098720:AAGcu0lM-wzOY1VW4R8Iu7__4MLhFAoWVsg";
+  const OWNER_ID = "284907405";
+
+  const PLANS = {
+    plan_14: { name: "14 дней", price: "249₽" },
+    plan_30: { name: "1 месяц", price: "490₽" },
+    plan_90: { name: "3 месяца", price: "1290₽" },
+  };
+
+  let selectedPlan = null;
+
+  function selectPlan(key) {
+    selectedPlan = key;
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('card_' + key).classList.add('selected');
+    updateSummary();
+    checkReady();
+  }
+
+  function onEmailInput() {
+    updateSummary();
+    checkReady();
+  }
+
+  function updateSummary() {
+    const email = document.getElementById('emailInput').value.trim();
+    const summary = document.getElementById('summary');
+
+    if (selectedPlan && email.includes('@')) {
+      const plan = PLANS[selectedPlan];
+      document.getElementById('summaryPlan').textContent = plan.name;
+      document.getElementById('summaryEmail').textContent = email;
+      document.getElementById('summaryPrice').textContent = plan.price;
+      summary.classList.add('show');
+    } else {
+      summary.classList.remove('show');
+    }
+  }
+
+  function checkReady() {
+    const email = document.getElementById('emailInput').value.trim();
+    const valid = selectedPlan && email.includes('@') && email.includes('.');
+    document.getElementById('orderBtn').disabled = !valid;
+  }
+
+  async function sendTelegramMessage(chatId, text) {
+    try {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: chatId, text: text, parse_mode: 'Markdown'}),
+      });
+    } catch(e) {}
+  }
+
+  async function submitOrder() {
+    const email = document.getElementById('emailInput').value.trim();
+    if (!selectedPlan || !email) return;
+
+    const plan = PLANS[selectedPlan];
+    const btn = document.getElementById('orderBtn');
+    btn.disabled = true;
+    btn.textContent = 'Отправляем...';
+
+    const user = tg.initDataUnsafe?.user;
+    const userName = user?.first_name || 'Клиент';
+    const username = user?.username || 'нет';
+    const userId = user?.id || '';
+
+    // Уведомление владельцу
+    await sendTelegramMessage(OWNER_ID,
+      `🔔 *Новый заказ (Mini App)!*\n\n` +
+      `👤 ${userName} (@${username})\n` +
+      `🆔 \`${userId}\`\n` +
+      `📦 ${plan.name} — ${plan.price}\n` +
+      `📧 \`${email}\``
+    );
+
+    // Подтверждение клиенту
+    if (userId) {
+      await sendTelegramMessage(userId,
+        `🎉 *Заявка принята!*\n\n` +
+        `Тариф: ${plan.name} — ${plan.price}\n` +
+        `Email: \`${email}\`\n\n` +
+        `⏳ Активация в течение 1–3 часов.\n` +
+        `Реквизиты для оплаты придут отдельно.`
+      );
+    }
+
+    // Показываем экран успеха
+    document.getElementById('mainContent').classList.add('hide');
+    document.getElementById('successScreen').classList.add('show');
+
+    document.getElementById('orderDetails').innerHTML = `
+      <div class="row"><span class="row-label">Тариф</span><span>${plan.name}</span></div>
+      <div class="row"><span class="row-label">Стоимость</span><span>${plan.price}</span></div>
+      <div class="row"><span class="row-label">Email</span><span>${email}</span></div>
+    `;
+  }
+</script>
+
+</body>
+</html>
