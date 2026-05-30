@@ -1,9 +1,10 @@
 import os
 import json
-import logging
 import time
-import telebot
+import logging
 import requests
+import telebot
+from flask import Flask, request
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +13,36 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID", "")
 MINIAPP_URL = os.environ.get("MINIAPP_URL", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+PORT = int(os.environ.get("PORT", 8080))
+
+bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
+
+PLANS = {
+    "plan_14": {"name": "14 дней", "price": "249₽"},
+    "plan_30": {"name": "1 месяц", "price": "490₽"},
+    "plan_90": {"name": "3 месяца", "price": "1290₽"},
+}
+
+user_state = {}
+user_orders = {}
+
+SYSTEM_PROMPT = """Ты — вежливый менеджер по продажам Adobe Creative Cloud подписок.
+Отвечай коротко и по делу, на русском языке.
+
+Информация о продукте:
+- 14 дней доступа — 249₽
+- 1 месяц — 490₽
+- 3 месяца — 1290₽ (выгоднее всего)
+- Активация: клиент присылает свой email от Adobe, мы добавляем подписку в течение 1-3 часов
+- Входит: все приложения Adobe CC (Photoshop, Illustrator, Premiere Pro, After Effects и др.), 100 ГБ облако
+- Оплата: реквизиты приходят после оформления заявки
+- Работаем 10:00–22:00 МСК
+
+Если клиент хочет купить — предложи нажать кнопку "Открыть магазин" или написать /buy.
+Не придумывай информацию которой нет выше. Отвечай дружелюбно и коротко (2-4 предложения)."""
+
 
 def ask_gemini(question):
     if not GEMINI_API_KEY:
@@ -32,34 +63,6 @@ def ask_gemini(question):
             logging.error(f"Gemini attempt {attempt+1}: {e}")
             time.sleep(5)
     return None
-
-SYSTEM_PROMPT = """Ты — вежливый менеджер по продажам Adobe Creative Cloud подписок.
-Отвечай коротко и по делу, на русском языке.
-
-Информация о продукте:
-- 14 дней доступа — 249₽
-- 1 месяц — 490₽
-- 3 месяца — 1290₽ (выгоднее всего)
-- Активация: клиент присылает свой email от Adobe, мы добавляем подписку в течение 1-3 часов
-- Входит: все приложения Adobe CC (Photoshop, Illustrator, Premiere Pro, After Effects и др.), 100 ГБ облако
-- Оплата: реквизиты приходят после оформления заявки
-- Работаем 10:00–22:00 МСК
-
-Если клиент хочет купить — предложи нажать кнопку "Открыть магазин" или написать /buy.
-Не придумывай информацию которой нет выше. Отвечай дружелюбно и коротко (2-4 предложения)."""
-
-bot = telebot.TeleBot(BOT_TOKEN)
-
-PLANS = {
-    "plan_14": {"name": "14 дней", "price": "249₽"},
-    "plan_30": {"name": "1 месяц", "price": "490₽"},
-    "plan_90": {"name": "3 месяца", "price": "1290₽"},
-}
-
-# Храним состояние пользователя
-user_state = {}
-user_orders = {}
-processed_messages = set()  # защита от дублирования
 
 
 def main_menu():
@@ -143,12 +146,7 @@ def callback_handler(call):
     bot.answer_callback_query(call.id)
 
     if call.data == "show_plans":
-        bot.send_message(
-            call.message.chat.id,
-            "🛒 *Выбери тариф:*",
-            reply_markup=plans_menu(),
-            parse_mode="Markdown",
-        )
+        bot.send_message(call.message.chat.id, "🛒 *Выбери тариф:*", reply_markup=plans_menu(), parse_mode="Markdown")
 
     elif call.data == "my_status":
         order = user_orders.get(call.message.chat.id)
@@ -161,10 +159,7 @@ def callback_handler(call):
     elif call.data == "help_info":
         bot.send_message(
             call.message.chat.id,
-            "❓ *Частые вопросы*\n\n"
-            "*Как работает?*\nМы добавляем твой email в Adobe CC.\n\n"
-            "*Как быстро?*\n1–3 часа в рабочее время.\n\n"
-            "*Как оплатить?*\nПосле заявки пришлём реквизиты.",
+            "❓ *Частые вопросы*\n\n*Как работает?*\nМы добавляем твой email в Adobe CC.\n\n*Как быстро?*\n1–3 часа в рабочее время.\n\n*Как оплатить?*\nПосле заявки пришлём реквизиты.",
             parse_mode="Markdown",
         )
 
@@ -175,8 +170,7 @@ def callback_handler(call):
             user_state[call.message.chat.id] = {"step": "await_email", "plan": plan_key}
             bot.send_message(
                 call.message.chat.id,
-                f"✅ Ты выбрал: *{plan['name']} — {plan['price']}*\n\n"
-                f"Введи свой email для активации:",
+                f"✅ Ты выбрал: *{plan['name']} — {plan['price']}*\n\nВведи свой email для активации:",
                 parse_mode="Markdown",
             )
 
@@ -184,7 +178,6 @@ def callback_handler(call):
 @bot.message_handler(func=lambda m: user_state.get(m.chat.id, {}).get("step") == "await_email")
 def receive_email(message):
     email = message.text.strip()
-
     if "@" not in email or "." not in email:
         bot.send_message(message.chat.id, "❌ Это не похоже на email. Попробуй ещё раз:")
         return
@@ -192,16 +185,11 @@ def receive_email(message):
     plan_key = user_state[message.chat.id]["plan"]
     plan = PLANS[plan_key]
     user_state.pop(message.chat.id, None)
-
     user_orders[message.chat.id] = {"plan": plan["name"], "email": email}
 
     bot.send_message(
         message.chat.id,
-        f"🎉 *Заявка принята!*\n\n"
-        f"Тариф: {plan['name']} — {plan['price']}\n"
-        f"Email: `{email}`\n\n"
-        f"⏳ Активация в течение 1–3 часов.\n"
-        f"Реквизиты для оплаты придут отдельно.",
+        f"🎉 *Заявка принята!*\n\nТариф: {plan['name']} — {plan['price']}\nEmail: `{email}`\n\n⏳ Активация в течение 1–3 часов.\nРеквизиты для оплаты придут отдельно.",
         parse_mode="Markdown",
     )
 
@@ -210,18 +198,13 @@ def receive_email(message):
             user = message.from_user
             bot.send_message(
                 int(OWNER_CHAT_ID),
-                f"🔔 *Новый заказ!*\n\n"
-                f"👤 {user.full_name} (@{user.username or 'нет'})\n"
-                f"🆔 `{user.id}`\n"
-                f"📦 {plan['name']} — {plan['price']}\n"
-                f"📧 `{email}`",
+                f"🔔 *Новый заказ!*\n\n👤 {user.full_name} (@{user.username or 'нет'})\n🆔 `{user.id}`\n📦 {plan['name']} — {plan['price']}\n📧 `{email}`",
                 parse_mode="Markdown",
             )
         except Exception as e:
             logging.error(f"Ошибка уведомления: {e}")
 
 
-# Обработка данных из Mini App
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data(message):
     try:
@@ -230,28 +213,17 @@ def web_app_data(message):
         price = data.get("price", "")
         email = data.get("email", "")
         user = message.from_user
-
         user_orders[message.chat.id] = {"plan": plan_name, "email": email}
-
         bot.send_message(
             message.chat.id,
-            f"🎉 *Заявка принята!*\n\n"
-            f"Тариф: {plan_name} — {price}\n"
-            f"Email: `{email}`\n\n"
-            f"⏳ Активация в течение 1–3 часов.\n"
-            f"Реквизиты для оплаты придут отдельно.",
+            f"🎉 *Заявка принята!*\n\nТариф: {plan_name} — {price}\nEmail: `{email}`\n\n⏳ Активация в течение 1–3 часов.\nРеквизиты для оплаты придут отдельно.",
             parse_mode="Markdown",
         )
-
         if OWNER_CHAT_ID:
             try:
                 bot.send_message(
                     int(OWNER_CHAT_ID),
-                    f"🔔 *Новый заказ (Mini App)!*\n\n"
-                    f"👤 {user.full_name} (@{user.username or 'нет'})\n"
-                    f"🆔 `{user.id}`\n"
-                    f"📦 {plan_name} — {price}\n"
-                    f"📧 `{email}`",
+                    f"🔔 *Новый заказ (Mini App)!*\n\n👤 {user.full_name} (@{user.username or 'нет'})\n🆔 `{user.id}`\n📦 {plan_name} — {price}\n📧 `{email}`",
                     parse_mode="Markdown",
                 )
             except Exception as e:
@@ -260,12 +232,8 @@ def web_app_data(message):
         logging.error(f"Ошибка web_app_data: {e}")
 
 
-# AI менеджер — отвечает на все остальные сообщения
 @bot.message_handler(func=lambda m: True)
 def ai_manager(message):
-    if message.message_id in processed_messages:
-        return
-    processed_messages.add(message.message_id)
     try:
         bot.send_chat_action(message.chat.id, "typing")
         answer = ask_gemini(message.text)
@@ -278,17 +246,27 @@ def ai_manager(message):
         bot.send_message(message.chat.id, "По всем вопросам: /help или /buy для заказа.")
 
 
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    update = telebot.types.Update.de_json(request.get_data(as_text=True))
+    bot.process_new_updates([update])
+    return "ok", 200
+
+
+@app.route("/")
+def index():
+    return "Bot is running", 200
+
+
 if __name__ == "__main__":
-    logging.info("Бот запущен...")
-    # Сбрасываем старые соединения
-    try:
+    if WEBHOOK_URL:
         bot.remove_webhook()
-        time.sleep(2)
-    except Exception:
-        pass
-    while True:
-        try:
-            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=30)
-        except Exception as e:
-            logging.error(f"Polling error: {e}")
-            time.sleep(15)
+        time.sleep(1)
+        bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+        logging.info(f"Webhook установлен: {WEBHOOK_URL}/{BOT_TOKEN}")
+        app.run(host="0.0.0.0", port=PORT)
+    else:
+        logging.info("Бот запущен в режиме polling...")
+        bot.remove_webhook()
+        time.sleep(1)
+        bot.infinity_polling(skip_pending=True)
