@@ -267,6 +267,12 @@ def ai_manager(message):
 if __name__ == "__main__":
     import time
     logging.info("Бот запущен...")
+    # Сбрасываем старые соединения
+    try:
+        bot.remove_webhook()
+        time.sleep(2)
+    except Exception:
+        pass
     while True:
         try:
             bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=30)
