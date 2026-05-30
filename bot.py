@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import telebot
-import google.generativeai as genai
+import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 logging.basicConfig(level=logging.INFO)
@@ -12,12 +12,16 @@ OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID", "")
 MINIAPP_URL = os.environ.get("MINIAPP_URL", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Настройка Gemini AI
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel("gemini-pro")
-else:
-    ai_model = None
+def ask_gemini(question):
+    if not GEMINI_API_KEY:
+        return None
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nВопрос клиента: {question}"}]}]
+    }
+    resp = requests.post(url, json=payload, timeout=15)
+    resp.raise_for_status()
+    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 SYSTEM_PROMPT = """Ты — вежливый менеджер по продажам Adobe Creative Cloud подписок.
 Отвечай коротко и по делу, на русском языке.
@@ -248,24 +252,16 @@ def web_app_data(message):
 # AI менеджер — отвечает на все остальные сообщения
 @bot.message_handler(func=lambda m: True)
 def ai_manager(message):
-    if not ai_model:
-        bot.send_message(
-            message.chat.id,
-            "Привет! Чтобы задать вопрос, воспользуйся командами:\n/buy — купить подписку\n/help — частые вопросы\n/status — мой заказ"
-        )
-        return
-
     try:
         bot.send_chat_action(message.chat.id, "typing")
-        prompt = f"{SYSTEM_PROMPT}\n\nВопрос клиента: {message.text}"
-        response = ai_model.generate_content(prompt)
-        bot.send_message(message.chat.id, response.text)
+        answer = ask_gemini(message.text)
+        if answer:
+            bot.send_message(message.chat.id, answer)
+        else:
+            bot.send_message(message.chat.id, "По всем вопросам: /help или /buy для заказа.")
     except Exception as e:
         logging.error(f"Ошибка AI: {e}")
-        bot.send_message(
-            message.chat.id,
-            "Привет! По всем вопросам о подписке Adobe CC — пиши /help или нажми /buy чтобы оформить заявку."
-        )
+        bot.send_message(message.chat.id, "По всем вопросам: /help или /buy для заказа.")
 
 
 if __name__ == "__main__":
