@@ -7,21 +7,18 @@ from telegram.ext import (
 )
 
 # ─────────────────────────────────────────────
-# НАСТРОЙКИ — заполни перед запуском
+# НАСТРОЙКИ
 # ─────────────────────────────────────────────
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_СЮДА")
-OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID", "ВСТАВЬ_СВОЙ_CHAT_ID")  # твой Telegram ID
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID", "")
 
-# ─────────────────────────────────────────────
 # Тарифы
-# ─────────────────────────────────────────────
 PLANS = {
-    "plan_14": {"name": "14 дней", "price": "249₽", "days": 14},
-    "plan_30": {"name": "1 месяц", "price": "490₽", "days": 30},
-    "plan_90": {"name": "3 месяца", "price": "1290₽", "days": 90},
+    "plan_14": {"name": "14 дней", "price": "249₽"},
+    "plan_30": {"name": "1 месяц", "price": "490₽"},
+    "plan_90": {"name": "3 месяца", "price": "1290₽"},
 }
 
-# Состояния диалога /buy
 ASK_EMAIL = 1
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +36,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await update.message.reply_text(
         "👋 Привет! Это бот для покупки *Adobe Creative Cloud*.\n\n"
-        "Здесь ты можешь оформить подписку — активация на твой email в течение нескольких часов.\n\n"
+        "Активация на твой email в течение нескольких часов.\n\n"
         "Выбери действие:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown",
@@ -53,152 +50,130 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "❓ *Частые вопросы*\n\n"
         "*Как работает подписка?*\n"
-        "Ты покупаешь доступ к Adobe Creative Cloud. Мы добавляем твой email в подписку — "
-        "ты получаешь доступ ко всем приложениям Adobe.\n\n"
+        "Мы добавляем твой email в Adobe CC — получаешь доступ ко всем приложениям.\n\n"
         "*Как быстро активируют?*\n"
-        "Обычно в течение 1–3 часов в рабочее время (10:00–22:00 МСК).\n\n"
-        "*Что нужно для активации?*\n"
-        "Только твой email от Adobe (или любой — создадим аккаунт).\n\n"
-        "*Что входит в подписку?*\n"
-        "Photoshop, Illustrator, Premiere Pro, After Effects и все остальные приложения Adobe CC.\n\n"
+        "1–3 часа в рабочее время (10:00–22:00 МСК).\n\n"
+        "*Что входит?*\n"
+        "Photoshop, Illustrator, Premiere Pro, After Effects и все остальные Adobe CC.\n\n"
         "*Как оплатить?*\n"
-        "После оформления заявки мы пришлём реквизиты для оплаты.\n\n"
-        "По другим вопросам пиши: @твой_юзернейм"
+        "После заявки пришлём реквизиты."
     )
-    if update.message:
-        await update.message.reply_text(text, parse_mode="Markdown")
-    else:
-        await update.callback_query.message.reply_text(text, parse_mode="Markdown")
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    if msg:
+        await msg.reply_text(text, parse_mode="Markdown")
 
 
 # ─────────────────────────────────────────────
 # /status
 # ─────────────────────────────────────────────
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    # Простая версия: выводим статус из user_data (сохраняется пока бот запущен)
     order = context.user_data.get("order")
     if order:
         text = (
-            f"📦 *Твой последний заказ:*\n\n"
+            f"📦 *Твой заказ:*\n\n"
             f"Тариф: {order['plan']}\n"
             f"Email: {order['email']}\n"
-            f"Статус: ⏳ Ожидает активации\n\n"
-            f"Активация обычно занимает 1–3 часа."
+            f"Статус: ⏳ Ожидает активации"
         )
     else:
-        text = (
-            "📦 У тебя пока нет активных заказов.\n\n"
-            "Нажми /buy чтобы оформить подписку."
-        )
-    if update.message:
-        await update.message.reply_text(text, parse_mode="Markdown")
-    else:
-        await update.callback_query.message.reply_text(text, parse_mode="Markdown")
+        text = "📦 У тебя пока нет заказов.\n\nНажми /buy чтобы оформить."
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    if msg:
+        await msg.reply_text(text, parse_mode="Markdown")
 
 
 # ─────────────────────────────────────────────
-# /buy — шаг 1: показать тарифы
+# /buy — показать тарифы
 # ─────────────────────────────────────────────
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton(f"⚡ 14 дней — 249₽", callback_data="buy_plan_14")],
-        [InlineKeyboardButton(f"📅 1 месяц — 490₽", callback_data="buy_plan_30")],
-        [InlineKeyboardButton(f"🏆 3 месяца — 1290₽", callback_data="buy_plan_90")],
+        [InlineKeyboardButton("⚡ 14 дней — 249₽", callback_data="buy_plan_14")],
+        [InlineKeyboardButton("📅 1 месяц — 490₽", callback_data="buy_plan_30")],
+        [InlineKeyboardButton("🏆 3 месяца — 1290₽", callback_data="buy_plan_90")],
     ]
     text = (
         "🛒 *Выбери тариф Adobe Creative Cloud:*\n\n"
         "⚡ *14 дней* — 249₽\n"
         "📅 *1 месяц* — 490₽\n"
-        "🏆 *3 месяца* — 1290₽ (выгоднее всего)\n\n"
-        "После выбора введи свой email для активации."
+        "🏆 *3 месяца* — 1290₽ (выгоднее всего)"
     )
-    if update.message:
-        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-    else:
-        await update.callback_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    if msg:
+        await msg.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
 # ─────────────────────────────────────────────
-# Callback: выбор тарифа → запросить email
+# Выбор тарифа
 # ─────────────────────────────────────────────
 async def plan_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    plan_key = query.data.replace("buy_", "")  # plan_14 / plan_30 / plan_90
+    plan_key = query.data.replace("buy_", "")
     plan = PLANS.get(plan_key)
     if not plan:
-        return
+        return ConversationHandler.END
 
     context.user_data["selected_plan"] = plan_key
     await query.message.reply_text(
         f"✅ Ты выбрал: *{plan['name']} — {plan['price']}*\n\n"
-        f"Введи свой email (аккаунт Adobe) для активации подписки:",
+        f"Введи свой email для активации:",
         parse_mode="Markdown",
     )
     return ASK_EMAIL
 
 
 # ─────────────────────────────────────────────
-# Шаг 2: получить email и создать заказ
+# Получить email
 # ─────────────────────────────────────────────
 async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     email = update.message.text.strip()
 
-    # Базовая проверка email
     if "@" not in email or "." not in email:
-        await update.message.reply_text("❌ Похоже, это не email. Попробуй ещё раз:")
+        await update.message.reply_text("❌ Это не похоже на email. Попробуй ещё раз:")
         return ASK_EMAIL
 
     plan_key = context.user_data.get("selected_plan", "plan_30")
     plan = PLANS[plan_key]
     user = update.effective_user
 
-    # Сохраняем заказ
     context.user_data["order"] = {"plan": plan["name"], "email": email}
 
-    # Сообщение клиенту
     await update.message.reply_text(
         f"🎉 *Заявка принята!*\n\n"
         f"Тариф: {plan['name']} — {plan['price']}\n"
         f"Email: `{email}`\n\n"
-        f"⏳ Мы активируем подписку в течение 1–3 часов.\n"
-        f"Реквизиты для оплаты придут отдельным сообщением.\n\n"
-        f"По вопросам: /help",
+        f"⏳ Активация в течение 1–3 часов.\n"
+        f"Реквизиты для оплаты придут отдельно.",
         parse_mode="Markdown",
     )
 
-    # Уведомление владельцу
-    owner_text = (
-        f"🔔 *Новый заказ!*\n\n"
-        f"👤 Клиент: {user.full_name} (@{user.username or 'нет'})\n"
-        f"🆔 ID: `{user.id}`\n"
-        f"📦 Тариф: {plan['name']} — {plan['price']}\n"
-        f"📧 Email: `{email}`"
-    )
-    try:
-        await context.bot.send_message(
-            chat_id=OWNER_CHAT_ID,
-            text=owner_text,
-            parse_mode="Markdown",
-        )
-    except Exception as e:
-        logger.error(f"Не удалось отправить уведомление владельцу: {e}")
+    if OWNER_CHAT_ID:
+        try:
+            await context.bot.send_message(
+                chat_id=int(OWNER_CHAT_ID),
+                text=(
+                    f"🔔 *Новый заказ!*\n\n"
+                    f"👤 {user.full_name} (@{user.username or 'нет'})\n"
+                    f"🆔 `{user.id}`\n"
+                    f"📦 {plan['name']} — {plan['price']}\n"
+                    f"📧 `{email}`"
+                ),
+                parse_mode="Markdown",
+            )
+        except Exception as e:
+            logger.error(f"Ошибка уведомления: {e}")
 
     return ConversationHandler.END
 
 
-# ─────────────────────────────────────────────
-# Отмена диалога
-# ─────────────────────────────────────────────
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Покупка отменена. Используй /buy чтобы начать заново.")
+    await update.message.reply_text("❌ Отменено. /buy — начать заново.")
     return ConversationHandler.END
 
 
 # ─────────────────────────────────────────────
-# Callback-кнопки из /start
+# Кнопки из /start
 # ─────────────────────────────────────────────
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -213,17 +188,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ─────────────────────────────────────────────
-# Запуск бота
+# Запуск
 # ─────────────────────────────────────────────
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ConversationHandler для /buy
     conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("buy", buy_command),
-            CallbackQueryHandler(plan_selected, pattern="^buy_plan_"),
-        ],
+        entry_points=[CallbackQueryHandler(plan_selected, pattern="^buy_plan_")],
         states={
             ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_email)],
         },
@@ -233,12 +204,12 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("buy", buy_command))
     app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(plan_selected, pattern="^buy_plan_"))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     logger.info("Бот запущен...")
-    app.run_polling()
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
