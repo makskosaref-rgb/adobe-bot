@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 import telebot
 import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -19,9 +20,18 @@ def ask_gemini(question):
     payload = {
         "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nВопрос клиента: {question}"}]}]
     }
-    resp = requests.post(url, json=payload, timeout=15)
-    resp.raise_for_status()
-    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    for attempt in range(3):
+        try:
+            resp = requests.post(url, json=payload, timeout=15)
+            if resp.status_code == 429:
+                time.sleep(10)
+                continue
+            resp.raise_for_status()
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            logging.error(f"Gemini attempt {attempt+1}: {e}")
+            time.sleep(5)
+    return None
 
 SYSTEM_PROMPT = """Ты — вежливый менеджер по продажам Adobe Creative Cloud подписок.
 Отвечай коротко и по делу, на русском языке.
@@ -49,6 +59,7 @@ PLANS = {
 # Храним состояние пользователя
 user_state = {}
 user_orders = {}
+processed_messages = set()  # защита от дублирования
 
 
 def main_menu():
@@ -252,6 +263,9 @@ def web_app_data(message):
 # AI менеджер — отвечает на все остальные сообщения
 @bot.message_handler(func=lambda m: True)
 def ai_manager(message):
+    if message.message_id in processed_messages:
+        return
+    processed_messages.add(message.message_id)
     try:
         bot.send_chat_action(message.chat.id, "typing")
         answer = ask_gemini(message.text)
@@ -265,7 +279,6 @@ def ai_manager(message):
 
 
 if __name__ == "__main__":
-    import time
     logging.info("Бот запущен...")
     # Сбрасываем старые соединения
     try:
