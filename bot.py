@@ -51,18 +51,15 @@ def ask_gemini(question):
     payload = {
         "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nВопрос клиента: {question}"}]}]
     }
-    for attempt in range(3):
-        try:
-            resp = requests.post(url, json=payload, timeout=15)
-            if resp.status_code == 429:
-                time.sleep(10)
-                continue
-            resp.raise_for_status()
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception as e:
-            logging.error(f"Gemini attempt {attempt+1}: {e}")
-            time.sleep(5)
-    return None
+    try:
+        resp = requests.post(url, json=payload, timeout=15)
+        logging.info(f"Gemini status: {resp.status_code}")
+        logging.info(f"Gemini response: {resp.text[:500]}")
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        logging.error(f"Gemini error: {e}")
+        return None
 
 
 def main_menu():
