@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import telebot
+import google.generativeai as genai
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 logging.basicConfig(level=logging.INFO)
@@ -9,6 +10,29 @@ logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID", "")
 MINIAPP_URL = os.environ.get("MINIAPP_URL", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# Настройка Gemini AI
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel("gemini-1.5-flash")
+else:
+    ai_model = None
+
+SYSTEM_PROMPT = """Ты — вежливый менеджер по продажам Adobe Creative Cloud подписок.
+Отвечай коротко и по делу, на русском языке.
+
+Информация о продукте:
+- 14 дней доступа — 249₽
+- 1 месяц — 490₽
+- 3 месяца — 1290₽ (выгоднее всего)
+- Активация: клиент присылает свой email от Adobe, мы добавляем подписку в течение 1-3 часов
+- Входит: все приложения Adobe CC (Photoshop, Illustrator, Premiere Pro, After Effects и др.), 100 ГБ облако
+- Оплата: реквизиты приходят после оформления заявки
+- Работаем 10:00–22:00 МСК
+
+Если клиент хочет купить — предложи нажать кнопку "Открыть магазин" или написать /buy.
+Не придумывай информацию которой нет выше. Отвечай дружелюбно и коротко (2-4 предложения)."""
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -221,7 +245,29 @@ def web_app_data(message):
         logging.error(f"Ошибка web_app_data: {e}")
 
 
+# AI менеджер — отвечает на все остальные сообщения
+@bot.message_handler(func=lambda m: True)
+def ai_manager(message):
+    if not ai_model:
+        bot.send_message(
+            message.chat.id,
+            "Привет! Чтобы задать вопрос, воспользуйся командами:\n/buy — купить подписку\n/help — частые вопросы\n/status — мой заказ"
+        )
+        return
+
+    try:
+        bot.send_chat_action(message.chat.id, "typing")
+        prompt = f"{SYSTEM_PROMPT}\n\nВопрос клиента: {message.text}"
+        response = ai_model.generate_content(prompt)
+        bot.send_message(message.chat.id, response.text)
+    except Exception as e:
+        logging.error(f"Ошибка AI: {e}")
+        bot.send_message(
+            message.chat.id,
+            "Привет! По всем вопросам о подписке Adobe CC — пиши /help или нажми /buy чтобы оформить заявку."
+        )
+
+
 if __name__ == "__main__":
     logging.info("Бот запущен...")
     bot.infinity_polling()
-
