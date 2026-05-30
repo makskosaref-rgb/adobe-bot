@@ -269,5 +269,11 @@ def ai_manager(message):
 
 
 if __name__ == "__main__":
+    import time
     logging.info("Бот запущен...")
-    bot.infinity_polling()
+    while True:
+        try:
+            bot.infinity_polling(skip_pending=True, timeout=60)
+        except Exception as e:
+            logging.error(f"Polling error: {e}")
+            time.sleep(5)
