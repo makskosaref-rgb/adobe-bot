@@ -15,7 +15,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 def ask_gemini(question):
     if not GEMINI_API_KEY:
         return None
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nВопрос клиента: {question}"}]}]
     }
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     logging.info("Бот запущен...")
     while True:
         try:
-            bot.infinity_polling(skip_pending=True, timeout=60)
+            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=30)
         except Exception as e:
             logging.error(f"Polling error: {e}")
-            time.sleep(5)
+            time.sleep(15)
